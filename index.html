@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Morpion Multi-Appareils P2P</title>
+    <!-- Chargement de la bibliothèque PeerJS pour le P2P sans serveur -->
+    <script src="https://unpkg.com"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            text-align: center;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        h1 { color: #333; }
+        .status {
+            font-weight: bold;
+            margin: 15px 0;
+            color: #555;
+            min-height: 24px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 20px auto;
+            width: 300px;
+            height: 300px;
+        }
+        .cell {
+            background-color: #e9ecef;
+            border: none;
+            border-radius: 8px;
+            font-size: 2.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .cell:hover { background-color: #dee2e6; }
+        .cell.X { color: #dc3545; }
+        .cell.O { color: #0d6efd; }
+        .btn {
+            background-color: #198754;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            font-size: 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+        }
+        .btn:hover { background-color: #157347; }
+        .share-box {
+            display: none;
+            background: #e2f0d9;
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 15px;
+            word-break: break-all;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Morpion P2P</h1>
+    <div id="status" class="status">Connexion au réseau...</div>
+    
+    <div class="grid" id="grid">
+        <button class="cell" data-index="0"></button>
+        <button class="cell" data-index="1"></button>
+        <button class="cell" data-index="2"></button>
+        <button class="cell" data-index="3"></button>
+        <button class="cell" data-index="4"></button>
+        <button class="cell" data-index="5"></button>
+        <button class="cell" data-index="6"></button>
+        <button class="cell" data-index="7"></button>
+        <button class="cell" data-index="8"></button>
+    </div>
+
+    <button id="resetBtn" class="btn" style="display:none;" onclick="resetGame(true)">Recommencer la partie</button>
+    
+    <div id="shareBox" class="share-box">
+        <p style="margin:0 0 5px 0;">Partage ce lien avec ton ami :</p>
+        <strong id="gameUrl"></strong>
+    </div>
+</div>
+
+<script>
+    const statusDiv = document.getElementById('status');
+    const shareBox = document.getElementById('shareBox');
+    const gameUrlSpan = document.getElementById('gameUrl');
+    const resetBtn = document.getElementById('resetBtn');
+    const cells = document.querySelectorAll('.cell');
+
+    let peer = null;
+    let conn = null;
+    let mySymbol = ''; // 'X' ou 'O'
+    let currentTurn = 'X'; // 'X' commence toujours
+    let board = Array(9).fill('');
+    let gameActive = false;
+
+    // Analyse de l'URL pour voir si on rejoint une partie existante
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetPeerId = urlParams.get('room');
+
+    if (targetPeerId) {
+        // Mode Invité (Joueur O)
+        mySymbol = 'O';
+        peer = new Peer();
+        
+        peer.on('open', () => {
+            statusDiv.innerText = "Connexion à l'adversaire...";
+            conn = peer.connect(targetPeerId);
+            setupConnection();
+        });
+    } else {
+        // Mode Hôte (Joueur X)
+        mySymbol = 'X';
+        peer = new Peer();
+        
+        peer.on('open', (id) => {
+            statusDiv.innerText = "En attente d'un adversaire...";
+            const roomUrl = `${window.location.origin}${window.location.pathname}?room=${id}`;
+            gameUrlSpan.innerText = roomUrl;
+            shareBox.style.display = 'block';
+        });
+
+        peer.on('connection', (connection) => {
+            conn = connection;
+            shareBox.style.display = 'none';
+            setupConnection();
+        });
+    }
+
+    // Configuration des canaux de communication
+    function setupConnection() {
+        conn.on('open', () => {
+            gameActive = true;
+            updateStatus();
+            resetGame(false);
+        });
+
+        conn.on('data', (data) => {
+            if (data.type === 'move') {
+                makeMove(data.index, data.symbol, false);
+            } else if (data.type === 'reset') {
+                resetGame(false);
+            }
+        });
+
+        conn.on('close', () => {
+            statusDiv.innerText = "L'adversaire s'est déconnecté.";
+            gameActive = false;
+        });
+    }
+
+    // Gestion des clics sur la grille
+    cells.forEach(cell => {
+        cell.addEventListener('click', (e) => {
+            const index = e.target.getAttribute('data-index');
+            
+            if (!gameActive || currentTurn !== mySymbol || board[index] !== '') return;
+            
+            makeMove(index, mySymbol, true);
+        });
+    });
+
+    // Appliquer un coup sur la grille
+    function makeMove(index, symbol, sendUpdate) {
+        board[index] = symbol;
+        cells[index].innerText = symbol;
+        cells[index].classList.add(symbol);
+
+        if (sendUpdate && conn) {
+            conn.send({ type: 'move', index: index, symbol: symbol });
+        }
+
+        if (checkWin()) {
+            statusDiv.innerText = `Le joueur ${symbol} a gagné !`;
+            gameActive = false;
+            resetBtn.style.display = 'block';
+            return;
+        }
+
+        if (board.every(cell => cell !== '')) {
+            statusDiv.innerText = "Match nul !";
+            gameActive = false;
+            resetBtn.style.display = 'block';
+            return;
+        }
+
+        currentTurn = currentTurn === 'X' ? 'O' : 'X';
+        updateStatus();
+    }
+
+    // Mettre à jour le texte du bandeau d'information
+    function updateStatus() {
+        if (!gameActive) return;
+        if (currentTurn === mySymbol) {
+            statusDiv.innerHTML = `À vous de jouer (<span class="${mySymbol}">${mySymbol}</span>)`;
+        } else {
+            const advSymbol = mySymbol === 'X' ? 'O' : 'X';
+            statusDiv.innerHTML = `Attente de l'adversaire (<span class="${advSymbol}">${advSymbol}</span>)`;
+        }
+    }
+
+    // Vérification des alignements gagnants
+    function checkWin() {
+        const winPatterns = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8], // Lignes
+            [0, 3, 6], [1, 4, 7], [2, 5, 8], // Colonnes
+            [0, 4, 8], [2, 4, 6]             // Diagonales
+        ];
+        return winPatterns.some(pattern => {
+            return pattern.every(index => board[index] === currentTurn);
+        });
+    }
+
+    // Réinitialiser la partie
+    function resetGame(sendUpdate) {
+        board.fill('');
+        currentTurn = 'X';
+        gameActive = true;
+        resetBtn.style.display = 'none';
+        
+        cells.forEach(cell => {
+            cell.innerText = '';
+            cell.className = 'cell';
+        });
+
+        updateStatus();
+
+        if (sendUpdate && conn) {
+            conn.send({ type: 'reset' });
+        }
+    }
+</script>
+
+</body>
+</html>
