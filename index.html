@@ -3,99 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Morpion Multi-Appareils en Ligne</title>
-    <!-- PeerJS pour la connexion P2P en temps réel sans serveur/DB -->
-    <script src="https://unpkg.com"></script>
+    <title>Morpion En Ligne Synchrone</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #eef2f3;
-            color: #333;
             text-align: center;
-            padding: 20px;
+            background-color: #1e1e24;
+            color: #fff;
             margin: 0;
-        }
-        h1 { color: #2c3e50; }
-        .setup-container {
-            background: white;
             padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            display: inline-block;
-            margin-bottom: 20px;
-            max-width: 90%;
         }
-        input {
-            padding: 10px;
-            font-size: 16px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            margin: 5px;
-            width: 200px;
-        }
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            background-color: #3498db;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-        button:hover { background-color: #2980b9; }
+        h1 { margin-bottom: 5px; }
         #status {
-            font-weight: bold;
+            font-size: 1.2rem;
             margin: 15px 0;
-            color: #7f8c8d;
+            color: #00adb5;
+            font-weight: bold;
         }
-        .board {
+        #game-board {
             display: grid;
             grid-template-columns: repeat(3, 100px);
             grid-template-rows: repeat(3, 100px);
-            gap: 5px;
+            gap: 10px;
             justify-content: center;
-            margin-top: 20px;
-            display: none; /* Masqué tant que la connexion n'est pas établie */
+            margin: 20px auto;
         }
         .cell {
-            background-color: white;
-            border: 2px solid #bdc3c7;
+            background-color: #2a2a35;
+            border: 2px solid #3f3f5c;
             border-radius: 8px;
-            font-size: 48px;
+            font-size: 3rem;
             font-weight: bold;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            line-height: 100px;
             cursor: pointer;
+            transition: background 0.2s;
             user-select: none;
-            transition: 0.1s;
         }
-        .cell:hover { background-color: #ecf0f1; }
-        .cell.X { color: #e74c3c; }
-        .cell.O { color: #2ecc71; }
+        .cell:hover { background-color: #3f3f5c; }
+        .cell.X { color: #ff2e63; }
+        .cell.O { color: #08d9d6; }
+        button {
+            padding: 10px 20px;
+            font-size: 1rem;
+            background-color: #00adb5;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover { background-color: #008c9e; }
     </style>
 </head>
 <body>
 
-    <h1>❌ Morpion En Ligne ⭕</h1>
-
-    <div class="setup-container">
-        <div id="peer-id-section">
-            <p>Votre identifiant de connexion unique :</p>
-            <h3 id="my-id" style="color: #3498db;">Chargement...</h3>
-        </div>
-        <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
-        <div>
-            <p>Rejoindre un ami :</p>
-            <input type="text" id="opponent-id" placeholder="Entrez l'ID de votre ami">
-            <button id="connect-btn">Se connecter</button>
-        </div>
-    </div>
-
-    <div id="status">En attente du réseau PeerJS...</div>
-
-    <div class="board" id="game-board">
+    <h1>Morpion Multi-Appareils</h1>
+    <div id="status">Connexion au serveur...</div>
+    
+    <div id="game-board">
         <div class="cell" data-index="0"></div>
         <div class="cell" data-index="1"></div>
         <div class="cell" data-index="2"></div>
@@ -107,146 +72,125 @@
         <div class="cell" data-index="8"></div>
     </div>
 
-    <script>
-        let peer = null;
-        let conn = null;
-        let mySymbol = '';     // 'X' ou 'O'
-        let currentTurn = 'X'; // Les X commencent toujours
-        let boardState = Array(9).fill('');
-        let gameActive = false;
+    <button onclick="resetGame()">Réinitialiser la partie</button>
 
-        const statusDiv = document.getElementById('status');
-        const boardDiv = document.getElementById('game-board');
+    <script>
+        // Utilisation d'un serveur WebSocket public de démo pour l'envoi de messages
+        const socket = new WebSocket('wss://://socketsbay.com');
+        
+        let board = ["", "", "", "", "", "", "", "", ""];
+        let mySign = null; 
+        let currentTurn = "X";
+        let gameActive = true;
+
+        const statusDisplay = document.getElementById('status');
         const cells = document.querySelectorAll('.cell');
 
-        // Génère un ID court et lisible de 4 chiffres
-        const shortId = Math.floor(1000 + Math.random() * 9000).toString();
+        socket.onopen = () => {
+            statusDisplay.innerText = "Connecté ! Cliquez sur une case pour attribuer votre rôle (X ou O).";
+        };
 
-        // Initialisation de la connexion PeerJS
-        peer = new Peer(shortId);
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
 
-        peer.on('open', (id) => {
-            document.getElementById('my-id').innerText = id;
-            statusDiv.innerText = "Prêt ! Donnez votre ID à un ami ou entrez le sien.";
-        });
+            if (data.type === "move") {
+                board = data.board;
+                currentTurn = data.nextTurn;
+                updateUI();
+                checkResult();
+            } else if (data.type === "reset") {
+                board = ["", "", "", "", "", "", "", "", ""];
+                currentTurn = "X";
+                gameActive = true;
+                updateUI();
+                statusDisplay.innerText = "Partie réinitialisée. Au tour des X !";
+            }
+        };
 
-        // 1. Cas où l'on REÇOIT une connexion (Hôte - Joueur X)
-        peer.on('connection', (connection) => {
-            if (conn) { 
-                connection.close(); // Refuse si déjà en partie
+        socket.onerror = () => {
+            statusDisplay.innerText = "Erreur de connexion au serveur.";
+        };
+
+        cells.forEach(cell => cell.addEventListener('click', handleCellClick));
+
+        function handleCellClick(e) {
+            const clickedCell = e.target;
+            const clickedIndex = parseInt(clickedCell.getAttribute('data-index'));
+
+            if (board[clickedIndex] !== "" || !gameActive) return;
+
+            // Assigne le rôle au premier clic si non défini
+            if (!mySign) {
+                // S'il y a plus de X que de O sur le terrain, on devient O, sinon X
+                const xCount = board.filter(v => v === 'X').length;
+                const oCount = board.filter(v => v === 'O').length;
+                mySign = xCount <= oCount ? "X" : "O";
+                alert("Vous jouez avec le symbole : " + mySign);
+            }
+
+            // Vérifie si c'est le tour du joueur
+            if (currentTurn !== mySign) {
+                statusDisplay.innerText = `Ce n'est pas votre tour ! Vous êtes ${mySign}.`;
                 return;
             }
-            conn = connection;
-            mySymbol = 'X';
-            setupConnectionHandlers();
-            statusDiv.innerText = "Ami connecté ! Vous jouez les X. À vous de commencer !";
-            startGame();
-        });
 
-        // 2. Cas où l'on INITIE la connexion (Invité - Joueur O)
-        document.getElementById('connect-btn').addEventListener('click', () => {
-            const oppId = document.getElementById('opponent-id').value.trim();
-            if (!oppId) return;
+            // Met à jour localement et envoie aux autres appareils
+            board[clickedIndex] = mySign;
+            const nextTurn = mySign === "X" ? "O" : "X";
 
-            statusDiv.innerText = "Connexion en cours...";
-            conn = peer.connect(oppId);
-            mySymbol = 'O';
+            const moveData = {
+                type: "move",
+                board: board,
+                nextTurn: nextTurn
+            };
 
-            conn.on('open', () => {
-                statusDiv.innerText = "Connecté ! Vous jouez les O. Attendez le coup de votre ami.";
-                startGame();
-            });
-
-            setupConnectionHandlers();
-        });
-
-        // Gestion des paquets de données reçus en temps réel
-        function setupConnectionHandlers() {
-            conn.on('data', (data) => {
-                if (data.type === 'move') {
-                    makeMove(data.index, data.symbol);
-                }
-            });
-
-            conn.on('close', () => {
-                statusDiv.innerText = "Votre ami a quitté la partie.";
-                gameActive = false;
-                conn = null;
-            });
+            socket.send(JSON.stringify(moveData));
         }
 
-        // Démarrage de la grille de jeu
-        function startGame() {
-            boardState.fill('');
-            cells.forEach(cell => {
-                cell.innerText = '';
-                cell.className = 'cell';
+        function updateUI() {
+            cells.forEach((cell, index) => {
+                cell.innerText = board[index];
+                cell.className = `cell ${board[index]}`;
             });
-            currentTurn = 'X';
-            gameActive = true;
-            boardDiv.style.display = 'grid';
-        }
-
-        // Gestion du clic sur une case
-        cells.forEach(cell => {
-            cell.addEventListener('click', () => {
-                const index = cell.getAttribute('data-index');
-
-                // On vérifie si le coup est autorisé
-                if (!gameActive || currentTurn !== mySymbol || boardState[index] !== '') {
-                    return;
-                }
-
-                // Applique le coup localement
-                makeMove(index, mySymbol);
-
-                // Envoie le coup à l'adversaire
-                if (conn && conn.open) {
-                    conn.send({ type: 'move', index: index, symbol: mySymbol });
-                }
-            });
-        });
-
-        // Appliquer un coup (local ou distant)
-        function makeMove(index, symbol) {
-            boardState[index] = symbol;
-            const cell = cells[index];
-            cell.innerText = symbol;
-            cell.classList.add(symbol);
-
-            if (checkWin()) {
-                statusDiv.innerText = `Partie terminée ! Le joueur ${symbol} a gagné !`;
-                gameActive = false;
-                return;
-            }
-
-            if (boardState.every(cell => cell !== '')) {
-                statusDiv.innerText = "Match nul !";
-                gameActive = false;
-                return;
-            }
-
-            // Alterne le tour
-            currentTurn = currentTurn === 'X' ? 'O' : 'X';
             
-            if (currentTurn === mySymbol) {
-                statusDiv.innerText = "C'est votre tour !";
-            } else {
-                statusDiv.innerText = "En attente du coup de l'adversaire...";
+            if (gameActive) {
+                if (mySign) {
+                    statusDisplay.innerText = currentTurn === mySign ? "À votre tour de jouer !" : `Attente de l'adversaire (${currentTurn})...`;
+                } else {
+                    statusDisplay.innerText = `Au tour du joueur ${currentTurn}. Cliquez pour rejoindre.`;
+                }
             }
         }
 
-        // Algorithme de vérification de victoire
-        function checkWin() {
-            const winPatterns = [
-                [0, 1, 2], [3, 4, 5], [6, 7, 8], // Lignes
-                [0, 3, 6], [1, 4, 7], [2, 5, 8], // Colonnes
-                [0, 4, 8], [2, 4, 6]             // Diagonales
-            ];
+        const winningConditions = [, [3, 4, 5], [6, 7, 8], // Lignes, [1, 4, 7], [2, 5, 8], // Colonnes, [2, 4, 6]             // Diagonales
+        ];
 
-            return winPatterns.some(pattern => {
-                return pattern.every(index => boardState[index] === currentTurn);
-            });
+        function checkResult() {
+            let roundWon = false;
+            for (let i = 0; i < winningConditions.length; i++) {
+                const [a, b, c] = winningConditions[i];
+                if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+                    roundWon = true;
+                    break;
+                }
+            }
+
+            if (roundWon) {
+                const winner = currentTurn === "X" ? "O" : "X"; // Le joueur précédent a gagné
+                statusDisplay.innerText = `Le joueur ${winner} a gagné ! 🎉`;
+                gameActive = false;
+                return;
+            }
+
+            if (!board.includes("")) {
+                statusDisplay.innerText = "Match nul ! 🤝";
+                gameActive = false;
+            }
+        }
+
+        function resetGame() {
+            const resetData = { type: "reset" };
+            socket.send(JSON.stringify(resetData));
         }
     </script>
 </body>
