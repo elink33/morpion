@@ -3,251 +3,251 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Morpion Multi-Appareils P2P</title>
-    <!-- Chargement de la bibliothèque PeerJS pour le P2P sans serveur -->
+    <title>Morpion Multi-Appareils en Ligne</title>
+    <!-- PeerJS pour la connexion P2P en temps réel sans serveur/DB -->
     <script src="https://unpkg.com"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #eef2f3;
+            color: #333;
             text-align: center;
-            background-color: #f0f2f5;
-            margin: 0;
             padding: 20px;
+            margin: 0;
         }
-        .container {
-            max-width: 400px;
-            margin: 0 auto;
+        h1 { color: #2c3e50; }
+        .setup-container {
             background: white;
             padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: inline-block;
+            margin-bottom: 20px;
+            max-width: 90%;
         }
-        h1 { color: #333; }
-        .status {
-            font-weight: bold;
-            margin: 15px 0;
-            color: #555;
-            min-height: 24px;
+        input {
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin: 5px;
+            width: 200px;
         }
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            margin: 20px auto;
-            width: 300px;
-            height: 300px;
-        }
-        .cell {
-            background-color: #e9ecef;
-            border: none;
-            border-radius: 8px;
-            font-size: 2.5rem;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        .cell:hover { background-color: #dee2e6; }
-        .cell.X { color: #dc3545; }
-        .cell.O { color: #0d6efd; }
-        .btn {
-            background-color: #198754;
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #3498db;
             color: white;
             border: none;
-            padding: 10px 15px;
-            font-size: 1rem;
-            border-radius: 6px;
+            border-radius: 5px;
             cursor: pointer;
-            width: 100%;
-            margin-top: 10px;
+            transition: 0.2s;
         }
-        .btn:hover { background-color: #157347; }
-        .share-box {
-            display: none;
-            background: #e2f0d9;
-            padding: 10px;
-            border-radius: 6px;
-            margin-top: 15px;
-            word-break: break-all;
-            font-size: 0.9rem;
+        button:hover { background-color: #2980b9; }
+        #status {
+            font-weight: bold;
+            margin: 15px 0;
+            color: #7f8c8d;
         }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            grid-template-rows: repeat(3, 100px);
+            gap: 5px;
+            justify-content: center;
+            margin-top: 20px;
+            display: none; /* Masqué tant que la connexion n'est pas établie */
+        }
+        .cell {
+            background-color: white;
+            border: 2px solid #bdc3c7;
+            border-radius: 8px;
+            font-size: 48px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            user-select: none;
+            transition: 0.1s;
+        }
+        .cell:hover { background-color: #ecf0f1; }
+        .cell.X { color: #e74c3c; }
+        .cell.O { color: #2ecc71; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>Morpion P2P</h1>
-    <div id="status" class="status">Connexion au réseau...</div>
-    
-    <div class="grid" id="grid">
-        <button class="cell" data-index="0"></button>
-        <button class="cell" data-index="1"></button>
-        <button class="cell" data-index="2"></button>
-        <button class="cell" data-index="3"></button>
-        <button class="cell" data-index="4"></button>
-        <button class="cell" data-index="5"></button>
-        <button class="cell" data-index="6"></button>
-        <button class="cell" data-index="7"></button>
-        <button class="cell" data-index="8"></button>
+    <h1>❌ Morpion En Ligne ⭕</h1>
+
+    <div class="setup-container">
+        <div id="peer-id-section">
+            <p>Votre identifiant de connexion unique :</p>
+            <h3 id="my-id" style="color: #3498db;">Chargement...</h3>
+        </div>
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+        <div>
+            <p>Rejoindre un ami :</p>
+            <input type="text" id="opponent-id" placeholder="Entrez l'ID de votre ami">
+            <button id="connect-btn">Se connecter</button>
+        </div>
     </div>
 
-    <button id="resetBtn" class="btn" style="display:none;" onclick="resetGame(true)">Recommencer la partie</button>
-    
-    <div id="shareBox" class="share-box">
-        <p style="margin:0 0 5px 0;">Partage ce lien avec ton ami :</p>
-        <strong id="gameUrl"></strong>
+    <div id="status">En attente du réseau PeerJS...</div>
+
+    <div class="board" id="game-board">
+        <div class="cell" data-index="0"></div>
+        <div class="cell" data-index="1"></div>
+        <div class="cell" data-index="2"></div>
+        <div class="cell" data-index="3"></div>
+        <div class="cell" data-index="4"></div>
+        <div class="cell" data-index="5"></div>
+        <div class="cell" data-index="6"></div>
+        <div class="cell" data-index="7"></div>
+        <div class="cell" data-index="8"></div>
     </div>
-</div>
 
-<script>
-    const statusDiv = document.getElementById('status');
-    const shareBox = document.getElementById('shareBox');
-    const gameUrlSpan = document.getElementById('gameUrl');
-    const resetBtn = document.getElementById('resetBtn');
-    const cells = document.querySelectorAll('.cell');
+    <script>
+        let peer = null;
+        let conn = null;
+        let mySymbol = '';     // 'X' ou 'O'
+        let currentTurn = 'X'; // Les X commencent toujours
+        let boardState = Array(9).fill('');
+        let gameActive = false;
 
-    let peer = null;
-    let conn = null;
-    let mySymbol = ''; // 'X' ou 'O'
-    let currentTurn = 'X'; // 'X' commence toujours
-    let board = Array(9).fill('');
-    let gameActive = false;
+        const statusDiv = document.getElementById('status');
+        const boardDiv = document.getElementById('game-board');
+        const cells = document.querySelectorAll('.cell');
 
-    // Analyse de l'URL pour voir si on rejoint une partie existante
-    const urlParams = new URLSearchParams(window.location.search);
-    const targetPeerId = urlParams.get('room');
+        // Génère un ID court et lisible de 4 chiffres
+        const shortId = Math.floor(1000 + Math.random() * 9000).toString();
 
-    if (targetPeerId) {
-        // Mode Invité (Joueur O)
-        mySymbol = 'O';
-        peer = new Peer();
-        
-        peer.on('open', () => {
-            statusDiv.innerText = "Connexion à l'adversaire...";
-            conn = peer.connect(targetPeerId);
-            setupConnection();
-        });
-    } else {
-        // Mode Hôte (Joueur X)
-        mySymbol = 'X';
-        peer = new Peer();
-        
+        // Initialisation de la connexion PeerJS
+        peer = new Peer(shortId);
+
         peer.on('open', (id) => {
-            statusDiv.innerText = "En attente d'un adversaire...";
-            const roomUrl = `${window.location.origin}${window.location.pathname}?room=${id}`;
-            gameUrlSpan.innerText = roomUrl;
-            shareBox.style.display = 'block';
+            document.getElementById('my-id').innerText = id;
+            statusDiv.innerText = "Prêt ! Donnez votre ID à un ami ou entrez le sien.";
         });
 
+        // 1. Cas où l'on REÇOIT une connexion (Hôte - Joueur X)
         peer.on('connection', (connection) => {
-            conn = connection;
-            shareBox.style.display = 'none';
-            setupConnection();
-        });
-    }
-
-    // Configuration des canaux de communication
-    function setupConnection() {
-        conn.on('open', () => {
-            gameActive = true;
-            updateStatus();
-            resetGame(false);
-        });
-
-        conn.on('data', (data) => {
-            if (data.type === 'move') {
-                makeMove(data.index, data.symbol, false);
-            } else if (data.type === 'reset') {
-                resetGame(false);
+            if (conn) { 
+                connection.close(); // Refuse si déjà en partie
+                return;
             }
+            conn = connection;
+            mySymbol = 'X';
+            setupConnectionHandlers();
+            statusDiv.innerText = "Ami connecté ! Vous jouez les X. À vous de commencer !";
+            startGame();
         });
 
-        conn.on('close', () => {
-            statusDiv.innerText = "L'adversaire s'est déconnecté.";
-            gameActive = false;
+        // 2. Cas où l'on INITIE la connexion (Invité - Joueur O)
+        document.getElementById('connect-btn').addEventListener('click', () => {
+            const oppId = document.getElementById('opponent-id').value.trim();
+            if (!oppId) return;
+
+            statusDiv.innerText = "Connexion en cours...";
+            conn = peer.connect(oppId);
+            mySymbol = 'O';
+
+            conn.on('open', () => {
+                statusDiv.innerText = "Connecté ! Vous jouez les O. Attendez le coup de votre ami.";
+                startGame();
+            });
+
+            setupConnectionHandlers();
         });
-    }
 
-    // Gestion des clics sur la grille
-    cells.forEach(cell => {
-        cell.addEventListener('click', (e) => {
-            const index = e.target.getAttribute('data-index');
-            
-            if (!gameActive || currentTurn !== mySymbol || board[index] !== '') return;
-            
-            makeMove(index, mySymbol, true);
-        });
-    });
+        // Gestion des paquets de données reçus en temps réel
+        function setupConnectionHandlers() {
+            conn.on('data', (data) => {
+                if (data.type === 'move') {
+                    makeMove(data.index, data.symbol);
+                }
+            });
 
-    // Appliquer un coup sur la grille
-    function makeMove(index, symbol, sendUpdate) {
-        board[index] = symbol;
-        cells[index].innerText = symbol;
-        cells[index].classList.add(symbol);
-
-        if (sendUpdate && conn) {
-            conn.send({ type: 'move', index: index, symbol: symbol });
+            conn.on('close', () => {
+                statusDiv.innerText = "Votre ami a quitté la partie.";
+                gameActive = false;
+                conn = null;
+            });
         }
 
-        if (checkWin()) {
-            statusDiv.innerText = `Le joueur ${symbol} a gagné !`;
-            gameActive = false;
-            resetBtn.style.display = 'block';
-            return;
+        // Démarrage de la grille de jeu
+        function startGame() {
+            boardState.fill('');
+            cells.forEach(cell => {
+                cell.innerText = '';
+                cell.className = 'cell';
+            });
+            currentTurn = 'X';
+            gameActive = true;
+            boardDiv.style.display = 'grid';
         }
 
-        if (board.every(cell => cell !== '')) {
-            statusDiv.innerText = "Match nul !";
-            gameActive = false;
-            resetBtn.style.display = 'block';
-            return;
-        }
-
-        currentTurn = currentTurn === 'X' ? 'O' : 'X';
-        updateStatus();
-    }
-
-    // Mettre à jour le texte du bandeau d'information
-    function updateStatus() {
-        if (!gameActive) return;
-        if (currentTurn === mySymbol) {
-            statusDiv.innerHTML = `À vous de jouer (<span class="${mySymbol}">${mySymbol}</span>)`;
-        } else {
-            const advSymbol = mySymbol === 'X' ? 'O' : 'X';
-            statusDiv.innerHTML = `Attente de l'adversaire (<span class="${advSymbol}">${advSymbol}</span>)`;
-        }
-    }
-
-    // Vérification des alignements gagnants
-    function checkWin() {
-        const winPatterns = [
-            [0, 1, 2], [3, 4, 5], [6, 7, 8], // Lignes
-            [0, 3, 6], [1, 4, 7], [2, 5, 8], // Colonnes
-            [0, 4, 8], [2, 4, 6]             // Diagonales
-        ];
-        return winPatterns.some(pattern => {
-            return pattern.every(index => board[index] === currentTurn);
-        });
-    }
-
-    // Réinitialiser la partie
-    function resetGame(sendUpdate) {
-        board.fill('');
-        currentTurn = 'X';
-        gameActive = true;
-        resetBtn.style.display = 'none';
-        
+        // Gestion du clic sur une case
         cells.forEach(cell => {
-            cell.innerText = '';
-            cell.className = 'cell';
+            cell.addEventListener('click', () => {
+                const index = cell.getAttribute('data-index');
+
+                // On vérifie si le coup est autorisé
+                if (!gameActive || currentTurn !== mySymbol || boardState[index] !== '') {
+                    return;
+                }
+
+                // Applique le coup localement
+                makeMove(index, mySymbol);
+
+                // Envoie le coup à l'adversaire
+                if (conn && conn.open) {
+                    conn.send({ type: 'move', index: index, symbol: mySymbol });
+                }
+            });
         });
 
-        updateStatus();
+        // Appliquer un coup (local ou distant)
+        function makeMove(index, symbol) {
+            boardState[index] = symbol;
+            const cell = cells[index];
+            cell.innerText = symbol;
+            cell.classList.add(symbol);
 
-        if (sendUpdate && conn) {
-            conn.send({ type: 'reset' });
+            if (checkWin()) {
+                statusDiv.innerText = `Partie terminée ! Le joueur ${symbol} a gagné !`;
+                gameActive = false;
+                return;
+            }
+
+            if (boardState.every(cell => cell !== '')) {
+                statusDiv.innerText = "Match nul !";
+                gameActive = false;
+                return;
+            }
+
+            // Alterne le tour
+            currentTurn = currentTurn === 'X' ? 'O' : 'X';
+            
+            if (currentTurn === mySymbol) {
+                statusDiv.innerText = "C'est votre tour !";
+            } else {
+                statusDiv.innerText = "En attente du coup de l'adversaire...";
+            }
         }
-    }
-</script>
 
+        // Algorithme de vérification de victoire
+        function checkWin() {
+            const winPatterns = [
+                [0, 1, 2], [3, 4, 5], [6, 7, 8], // Lignes
+                [0, 3, 6], [1, 4, 7], [2, 5, 8], // Colonnes
+                [0, 4, 8], [2, 4, 6]             // Diagonales
+            ];
+
+            return winPatterns.some(pattern => {
+                return pattern.every(index => boardState[index] === currentTurn);
+            });
+        }
+    </script>
 </body>
 </html>
